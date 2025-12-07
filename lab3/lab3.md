@@ -1538,7 +1538,7 @@ R5#show ip ospf database router
       Number of TOS metrics: 0
        TOS 0 Metrics: 10
 ```
-### Analiza `show ip ospf database external`
+### Analiza `show ip ospf database router`
 Aby znaleźć router pełniący funkcję bramy do sieci zewnętrznej (ASBR), analizujemy LSA routera R2:
 
 ```text
@@ -1551,3 +1551,13 @@ AS Boundary Router
 ``` 
 
 Identyfikator routera ASBR to `192.168.0.2` (Router R2).
+
+## 7. Podsumowanie
+
+Ostatecznie:
+
+- Wieloobszarowy OSPF działa stabilnie, a wymiana LSA między strefami przebiega bezbłędnie.
+- Manipulacja kosztem łącza skutecznie pozwala sterować wyborem ścieżki przez router.
+- Redystrybucja tras połączyła protokoły OSPF i RIP, zapewniając komunikację w całej topologii.
+
+Sieć jest w pełni sprawna, co potwierdziły testy łączności.
