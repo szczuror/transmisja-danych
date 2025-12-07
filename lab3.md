@@ -7,6 +7,26 @@ Data: 05.12.2025
 
 ### Oto tabela przedstawiająca schemat adresowania zgodnie z wytycznymi zadania.
 
+| Router | Interfejs | Adres IP | Maska | Prefiks |
+| :---: | :--- | :--- | :--- | :---: |
+| **R1** | loopback | 192.168.0.1 | 255.255.255.255 | /32 |
+| | e0/0 | 192.168.11.1 | 255.255.255.252 | /30 |
+| **R2** | loopback | 192.168.0.2 | 255.255.255.255 | /32 |
+| | e0/0 | 192.168.11.2 | 255.255.255.252 | /30 |
+| | e0/1 | 192.168.10.1 | 255.255.255.252 | /30 |
+| | e0/2 | 192.168.10.5 | 255.255.255.252 | /30 |
+| **R3** | loopback | 192.168.0.3 | 255.255.255.255 | /32 |
+| | e0/0 | 192.168.10.9 | 255.255.255.252 | /30 |
+| | e0/2 | 192.168.10.6 | 255.255.255.252 | /30 |
+| | e0/3 | 192.168.10.13 | 255.255.255.252 | /30 |
+| **R4** | loopback | 192.168.0.4 | 255.255.255.255 | /32 |
+| | e0/1 | 192.168.10.2 | 255.255.255.252 | /30 |
+| | e0/2 | 192.168.10.17 | 255.255.255.252 | /30 |
+| | e0/3 | 192.168.10.14 | 255.255.255.252 | /30 |
+| **R5** | loopback | 192.168.0.5 | 255.255.255.255 | /32 |
+| | e0/0 | 192.168.10.10 | 255.255.255.252 | /30 |
+| | e0/2 | 192.168.10.18 | 255.255.255.252 | /30 |
+
 ### Analiza tablic routingu
 Celem tej części jest weryfikacja poprawności działania routingu w sieci oraz zrozumienie, w jaki sposób routery podejmują decyzje o przesyłaniu pakietów. Poniżej przedstawiono zrzuty polecenia show ip route dla poszczególnych routerów wraz z analizą kluczowych wpisów.
 
@@ -28,6 +48,8 @@ C       192.168.11.0 is directly connected, Ethernet0/0
      192.168.0.0/32 is subnetted, 1 subnets
 C       192.168.0.1 is directly connected, Loopback0
 R1#
+```
+```
 R2#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
        D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
@@ -47,7 +69,8 @@ C       192.168.11.0 is directly connected, Ethernet0/0
      192.168.0.0/32 is subnetted, 1 subnets
 C       192.168.0.2 is directly connected, Loopback0
 R2#
-
+```
+```
 R3#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
        D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
@@ -66,7 +89,8 @@ C       192.168.10.12 is directly connected, Ethernet0/3
      192.168.0.0/32 is subnetted, 1 subnets
 C       192.168.0.3 is directly connected, Loopback0
 R3#
-
+```
+```
 R4#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
        D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
@@ -85,7 +109,8 @@ C       192.168.10.16 is directly connected, Ethernet0/2
      192.168.0.0/32 is subnetted, 1 subnets
 C       192.168.0.4 is directly connected, Loopback0
 R4#
-
+```
+```
 R5#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
        D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
@@ -107,10 +132,9 @@ R5#
 
 Wpisy oznaczone literą C informują o sieciach podłączonych bezpośrednio do interfejsów routera. Router wie o nich automatycznie po przypisaniu adresu IP i podniesieniu interfejsu (stan up/up). Na tym etapie routery nie widzą jeszcze sieci odległych (np. R1 nie widzi pętli loopback routera R5), ponieważ nie skonfigurowaliśmy jeszcze protokołu routingu dynamicznego OSPF
 
-## 2. OSPF
+## 2. Konfiguracja OSPF
 
 ```
-
 R1(config-router)#do show ip ospf
  Routing Process "ospf 1" with ID 192.168.0.1
  Start time: 00:09:28.308, Time elapsed: 00:02:24.668
@@ -148,6 +172,11 @@ R1(config-router)#do show ip ospf
         Number of DoNotAge LSA 0
         Flood list length 0
 ```
+Wynik polecenia potwierdza poprawność uruchomienia procesu routingu.
+- Router przyjął identyfikator 192.168.0.1 (zgodnie z adresem Loopback).
+- Interfejsy zostały poprawnie przypisane do obszaru zerowego (szkieletowego).
+- Obecność 10 rekordów LSA świadczy o tym, że router otrzymał informacje o wszystkich łączach i pętlach zwrotnych od pozostałych 4 routerów w sieci.
+
 ```
 R1(config-router)#do show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
@@ -176,6 +205,13 @@ O       192.168.0.4 [110/21] via 192.168.11.2, 00:00:09, Ethernet0/0
 O       192.168.0.5 [110/31] via 192.168.11.2, 00:00:11, Ethernet0/0
 R1(config-router)#
 ```
+Tabela routingu wykazuje pełną zbieżność sieci:
+- (O) R1 nauczył się tras do wszystkich odległych podsieci (192.168.10.x) oraz interfejsów Loopback innych routerów (192.168.0.2 – 192.168.0.5).
+- Wartość metryki 110 to domyślny dystans administracyjny OSPF. Druga wartość (np. 31) to koszt ścieżki, obliczony na podstawie przepustowości łączy (referencyjne 100 Mbps).
+- Wszystkie trasy prowadzą przez adres 192.168.11.2 (R2), co jest zgodne z fizycznym połączeniem R1 do reszty topologii.
+
+
+
 
 ## 3. Baza danych OSPF
 
@@ -444,10 +480,62 @@ R5#show ip ospf database network
 
 R5#
 ```
+ 
+### A. Dlaczego w bazie danych OSPF jest dokładnie 5 Router LSA i 2 Network LSA? 
+- 5 Router LSA: W bazie znajduje się 5 wpisów tego typu, ponieważ w obszarze 0 aktywnie uczestniczy 5 routerów . W protokole OSPF każdy router generuje jeden LSA Typu 1, aby opisać samego siebie i swoje bezpośrednie połączenia.
 
-## 4
+- 2 Network LSA: LSA Typu 2 są generowane wyłącznie przez router wyznaczony dla łączy typu wielodostępowego. Po zmianie konfiguracji większości połączeń na typ point-to-point (które nie generują Network LSA), w sieci pozostały tylko dwa segmenty typu Broadcast, R-R2 oraz R3-R4. Dlatego w bazie widnieją dokładnie 2 wpisy Network LSA, reprezentujące te dwa segmenty.
 
-Router 1
+### B. Treść wiadomości typu Router LSA rozgłaszanej przez router R3
+Analizując sekcję `Link State ID: 192.168.0.3` z wydruku `show ip ospf database router`, router R3 ogłasza 6 połączeń (`Number of Links: 6`), co jest zgodne z topologią:
+
+- Stub Network: 192.168.0.3 – interfejs Loopback.
+
+- Transit Network: Link do DR 192.168.10.14 (połączenie z R4 typu Broadcast).
+
+- Point-to-Point: Sąsiad 192.168.0.5 (połączenie z R5).
+
+- Stub Network: 192.168.10.8/30 (podsieć połączenia z R5).
+
+- Point-to-Point: Sąsiad 192.168.0.2 (połączenie z R2).
+
+- Stub Network: 192.168.10.4/30 (podsieć połączenia z R2).
+
+### C. Zawartość wszystkich Network LSA
+Komenda `show ip ospf database network` wyświetla dwa wpisy, które potwierdzają strukturę segmentów Broadcast w topologii:
+
+- Link ID 192.168.10.14: Reprezentuje segment łączący R3 i R4.
+
+     - Attached Router: 192.168.0.4 (R4)
+
+     - Attached Router: 192.168.0.3 (R3)
+
+- Link ID 192.168.11.2: Reprezentuje segment łączący R1 i R2.
+
+     - Attached Router: 192.168.0.2 (R2)
+
+     - Attached Router: 192.168.0.1 (R1)
+
+### D. Które routery zostały wybrane jako urządzenia DR i dlaczego? 
+Wybór DR (Designated Router) w OSPF zależy od priorytetu interfejsu (domyślnie 1), a w przypadku remisu decyduje najwyższy identyfikator routera (Router ID).
+
+- Segment R1-R2: DR to R2 (adres interfejsu `192.168.11.2`).
+
+     - Router ID R2 (`192.168.0.2`) jest wyższe niż Router ID R1 (`192.168.0.1`).
+
+- Segment R3-R4: DR to R4 (adres interfejsu `192.168.10.14`).
+
+     - Router ID R4 (`192.168.0.4`) jest wyższe niż Router ID R3 (`192.168.0.3`).
+
+### E. W jaki sposób router R5 może wykryć topologię sieci na podstawie informacji z LSA?
+Router R5 gromadzi wszystkie otrzymane LSA w swojej bazie danych stanu łącza (LSDB).
+
+- Router LSA (Typ 1) dostarczają informacji o węzłach sieci (routerach) i ich krawędziach (do kogo są podłączeni).
+
+- Network LSA (Typ 2) dostarczają informacji o wspólnych segmentach sieci i routerach do nich podłączonych. Składając te dane, R5 buduje kompletny graf skierowany całej sieci. Następnie uruchamia na tym grafie algorytm Dijkstry (SPF - Shortest Path First), umieszczając siebie w korzeniu drzewa, aby obliczyć najkrótsze i bezpętlowe ścieżki do każdej dostępnej podsieci.
+
+## 4. Wieloobszarowy OSPF
+
 ```
 R1#show ip ospf database
 
@@ -477,6 +565,7 @@ Link ID         ADV Router      Age         Seq#       Checksum
 192.168.10.12   192.168.0.2     87          0x80000001 0x008FB1
 192.168.10.16   192.168.0.2     88          0x80000001 0x0067D5
 ```
+
 ```
 R1#show ip ospf database summary
 
@@ -594,7 +683,7 @@ R1#show ip ospf database summary
 
 R1#
 ```
-Router 5
+
 ```
 R5#show ip ospf database network
 
@@ -652,8 +741,8 @@ Link ID         ADV Router      Age         Seq#       Checksum
 Link ID         ADV Router      Age         Seq#       Checksum
 192.168.0.1     192.168.0.2     69          0x80000001 0x002438
 192.168.11.0    192.168.0.2     109         0x80000001 0x0098BD
-R5#
-R5#
+```
+```
 R5#show ip ospf database summary
 
             OSPF Router with ID (192.168.0.5) (Process ID 1)
@@ -683,11 +772,27 @@ R5#show ip ospf database summary
   Length: 28
   Network Mask: /30
         TOS: 0  Metric: 10
-
-R5#
 ```
 
-Show ip route dla kazdego
+### Analiza ```show ip ospf database```
+
+**Router 1**: W sekcji `Router Link States (Area 1)` widoczne są tylko dwa routery: `192.168.0.1` (R1) oraz `192.168.0.2` (R2).
+R1 znajduje się w obszarze typu "stub" (Area 1) i nie posiada pełnej wiedzy o topologii sieci szkieletowej (Area 0). Widzi jedynie routery znajdujące się w tym samym obszarze co on.
+
+**Router 5**: W sekcji `Router Link States (Area 0)` widoczne są routery tworzące szkielet sieci: R2, R3, R4, R5.
+R5 posiada pełną mapę topologiczną tylko dla swojego obszaru (Area 0). Nie widzi szczegółów połączeń wewnątrz Area 1.
+
+### Analiza `show ip ospf database summary`
+Summary LSA (Typ 3) to informacje generowane przez router brzegowy obszaru (ABR - w tym przypadku R2). Służą do ogłaszania dostępności sieci z jednego obszaru do drugiego, bez przekazywania szczegółów topologii (czyli "jak" routery są połączone). Zawierają jedynie informację: "Sieć X jest osiągalna przeze mnie z kosztem Y".
+
+**Router 1**
+Widzimy listę Summary LSA dla wszystkich sieci z Area 0 (np. `192.168.10.x`, loopbacki R3, R4, R5). Advertising Router: `192.168.0.2` (R2) – R2 jest bramą do reszty sieci.
+
+**Router 5**
+Widzimy listę Summary LSA dla sieci z Area 1 (czyli Loopback R1 `192.168.0.1` oraz łącze `192.168.11.0`). Advertising Router: `192.168.0.2` (R2) – R2 informuje szkielet o istnieniu sieci w Area 1.
+
+Bazy danych różnią się, ponieważ każdy router utrzymuje szczegółową mapę tylko własnego obszaru, a o innych obszarach wie jedynie tyle, ile przekaże mu router ABR (R2) w formie podsumowań (Summary LSA).
+
 ```
 R1#show ip route
 
@@ -795,8 +900,6 @@ O       192.168.0.5 [110/21] via 192.168.10.6, 00:04:01, Ethernet0/2
 
                     [110/21] via 192.168.10.2, 00:04:01, Ethernet0/1
 
-
-
 R3#show ip route
 
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
@@ -851,8 +954,6 @@ O       192.168.0.4 [110/11] via 192.168.10.14, 00:03:58, Ethernet0/3
 
 O       192.168.0.5 [110/11] via 192.168.10.10, 00:03:58, Ethernet0/0
 
-
-
 R4#show ip route
 
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
@@ -906,8 +1007,6 @@ O       192.168.0.3 [110/11] via 192.168.10.13, 00:04:03, Ethernet0/3
 C       192.168.0.4 is directly connected, Loopback0
 
 O       192.168.0.5 [110/11] via 192.168.10.18, 00:04:03, Ethernet0/2
-
-
 
 R5#show ip route
 
@@ -967,9 +1066,17 @@ O       192.168.0.4 [110/11] via 192.168.10.17, 00:04:08, Ethernet0/2
 
 C       192.168.0.5 is directly connected, Loopback0
 ```
+### Analiza `show ip route`
+Komendy potwierdzają poprawną segmentację sieci na obszary. Kluczowym dowodem jest znacznik IA (Inter-Area).
+
+- Na R1 (Area 1): Wszystkie trasy do sieci szkieletowych (np. `192.168.10.0`, `192.168.0.5`) są oznaczone jako O IA. `O IA 192.168.0.5 [110/31] via 192.168.11.2` Oznacza to, że R1 wie, iż te sieci znajdują się w innym obszarze i musi wysyłać pakiety do ABR (R2).
+
+- Na R5 (Area 0): Trasy do sieci z Area 1 (Loopback R1 `192.168.0.1` oraz łącze R1-R2 `192.168.11.0`) są oznaczone jako O IA. O IA `192.168.0.1 [110/31] via ...`
+
+- Na R2 (ABR): Jako router graniczny, R2 posiada interfejsy w obu obszarach. Dlatego w jego tablicy routingu nie ma tras oznaczonych IA. Traktuje on sieci z obu obszarów jako lokalne (Intra-Area) lub bezpośrednio podłączone (Connected).
 
 
-5
+## 5. Koszty łącza OSPF
 ```
 R4#ping 192.168.11.1
 
@@ -991,7 +1098,6 @@ Tracing the route to 192.168.11.1
 R4#
 ```
 
-dalej
 ```
 R1#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
@@ -1170,38 +1276,8 @@ R5#show ip ospf database external
         Metric: 100
         Forward Address: 0.0.0.0
         External Route Tag: 0
-
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
-R5#
+```
+```
 R5#show ip ospf database router
 
             OSPF Router with ID (192.168.0.5) (Process ID 1)
