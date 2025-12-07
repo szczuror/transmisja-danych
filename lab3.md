@@ -1086,8 +1086,13 @@ Sending 5, 100-byte ICMP Echos to 192.168.11.1, timeout is 2 seconds:
 Success rate is 100 percent (5/5), round-trip min/avg/max = 40/131/356 ms
 R4#
 ```
-```
+Polecenie `ping` wykorzystuje protokół ICMP do sprawdzenia osiągalności węzła docelowego.
 
+- Sekwencja znaków `!!!!!` oznacza, że na 5 wysłanych zapytań otrzymano 5 odpowiedzi.
+
+- `Success rate 100%` potwierdza pełną łączność w warstwie 3 (IP) pomiędzy routerem R4 a R1. Sieć jest zbieżna i działa poprawnie.
+
+```
 R4#traceroute 192.168.11.1
 
 Type escape sequence to abort.
@@ -1097,7 +1102,11 @@ Tracing the route to 192.168.11.1
   2 192.168.11.1 48 msec 68 msec 52 msec
 R4#
 ```
+Polecenie `traceroute` obrazuje rzeczywistą ścieżkę pakietów w sieci. Z powyższego wydruku wynika, że ruch odbywa się następująco:
+- Krok 1: `192.168.10.1` – pakiet trafia do routera R2.
+- Krok 2: `192.168.11.1` – pakiet dociera do celu (router R1).
 
+Pakiety są przekazywane najkrótszą drogą fizyczną (R4 → R2 → R1). Router OSPF wybrał tę trasę, ponieważ przy domyślnych ustawieniach wszystkie łącza Ethernet mają ten sam koszt, więc trasa bezpośrednia ma najniższy sumaryczny koszt
 ```
 R1#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
@@ -1126,6 +1135,14 @@ O IA    192.168.0.4 [110/21] via 192.168.11.2, 00:08:37, Ethernet0/0
 O IA    192.168.0.5 [110/31] via 192.168.11.2, 00:08:38, Ethernet0/0
 R1#
 ```
+### Tablica routingu R1
+W powyższym wydruku dla trasy do routera R4 (Loopback `192.168.0.4`) widzimy wpis [`110/21`].
+
+- 110 – to Dystans Administracyjny (Administrative Distance) dla OSPF.
+
+- 21 – to całkowity koszt (metryka) ścieżki.
+
+OSPF obliczył ten koszt sumując wagi wszystkich łączy po drodze: łącze R1-R2 (koszt 10) + łącze R2-R4 (koszt 10) + Loopback R4 (koszt 1) = 21.
 
 ```
 
@@ -1135,6 +1152,18 @@ R2#show ip ospf interface Ethernet0/1 | include Cost
   Process ID 1, Router ID 192.168.0.2, Network Type POINT_TO_POINT, Cost: 10
 R2#
 ```
+### Przepustowość do kosztu (R2)
+Zastosowanie poleceń na routerze R2 daje następujące wyniki:
+- BW 10000 Kbit/sec
+- Cost: 10
+
+Protokół OSPF automatycznie oblicza koszt łącza na podstawie jego przepustowości, korzystając z domyślnego pasma referencyjnego wynoszącego 100 Mbps. Wzór wygląda następująco:
+
+$$
+Koszt = \frac{\text{Reference Bandwidth}}{\text{Interface Bandwidth}} = \frac{100 \text{ Mbps}}{10 \text{ Mbps}} = 10
+$$
+
+Wynik ten potwierdza, że dla standardowego łącza Ethernet (10 Mbps) OSPF przypisuje koszt równy 10.
 
 ```
 
@@ -1143,16 +1172,18 @@ R2(config-if)#do show ip ospf interface Ethernet0/1 | include Cost
 R2(config-if)#
 
 ```
-
+Powyższy wynik potwierdza, że dla interfejsu Ethernet0/1 (łącze R2-R4) parametr Cost został skutecznie zmieniony z domyślnej wartości 10 na 100. Oznacza to, że dla protokołu OSPF to łącze stało się "droższe" (mniej preferowane).
 
 ```
-
 R4#ping 192.168.11.1
 
 Type escape sequence to abort.
 Sending 5, 100-byte ICMP Echos to 192.168.11.1, timeout is 2 seconds:
 !!!!!
 Success rate is 100 percent (5/5), round-trip min/avg/max = 56/65/76 ms
+```
+Mimo drastycznej zmiany kosztów jednego z łączy, sieć zachowała pełną spójność. Wynik !!!!! (100%) świadczy o tym, że protokół OSPF poprawnie przeliczył tablicę routingu i znalazł alternatywną, działającą ścieżkę do celu.
+```
 R4#traceroute 192.168.11.1
 
 Type escape sequence to abort.
@@ -1161,14 +1192,18 @@ Tracing the route to 192.168.11.1
   1 192.168.10.13 56 msec 12 msec 28 msec
   2 192.168.10.5 48 msec 48 msec 48 msec
   3 192.168.11.1 60 msec 56 msec 76 msec
-R4#
 ```
 
-## last
+Wynik traceroute pokazuje zmianę w ścieżce pakietów. Zamiast bezpośredniego połączenia do R2, pakiety wędrują teraz drogą okrężną: `R4 (start) -> R3 (192.168.10.13) -> R2 (192.168.10.5) -> R1 (cel)`.
+OSPF wybrał trasę, która fizycznie jest dłuższa (więcej skoków), ale posiada niższy łączny koszt:
+- Stara trasa bezpośrednia (R4-R2): Koszt 100 + 10 (R2-R1) = 110.
+- Nowa trasa przez R3: Koszt 10 (R4-R3) + 10 (R3-R2) + 10 (R2-R1) = 30.
 
-show ip route
+Ponieważ $30 < 110$, protokół wybrał drogę przez router R3.
+
+## 6. Redystrybucja tras
+
 ```
-
 R1(config-router)#do show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
        D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
@@ -1187,6 +1222,8 @@ C       192.168.11.0 is directly connected, Ethernet0/0
 R       192.168.0.0/24 [120/2] via 192.168.11.2, 00:00:06, Ethernet0/0
 C       192.168.0.1/32 is directly connected, Loopback0
 R1(config-router)#
+```
+```
 R5#show ip route
 Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
        D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
@@ -1214,7 +1251,17 @@ O       192.168.0.3/32 [110/11] via 192.168.10.9, 00:01:01, Ethernet0/0
 O       192.168.0.4/32 [110/11] via 192.168.10.17, 00:01:08, Ethernet0/2
 C       192.168.0.5/32 is directly connected, Loopback0
 ```
+### Weryfikacja redystrybucji tras
+W tablicy routingu R1 pojawiły się trasy oznaczone literą R.
+```R    192.168.10.0/24 [120/2] via 192.168.11.2```.
+- Router R1 uczy się o sieciach z domeny OSPF za pośrednictwem protokołu RIP.
+- Metryka `[120/2]` - 120 to Dystans Administracyjny dla RIP, 2 to liczba skoków. Wartośc ta wynika z konfiguracji na R2, który sztywno ustawił metryke wejściową dla tras OSPF wchodzących do RIP.
+### Analiza znacznika E2 przy Routerze R5
+W tablicy routingu R5 pojawiły się trasy oznaczone np. tak ```O E2    192.168.11.0 [110/100] via 192.168.10.9```
 
+`O E2` (OSPF External Type 2): Oznacza trasę zewnętrzną, która została redystrybuowana do OSPF z innego protokołu (w tym przypadku z RIP przez router R2). W przeciwieństwie do tras E1, w trasach E2 koszt jest stały w całej domenie OSPF i nie jest powiększany o koszt wewnętrznych łączy przesyłowych.
+
+Wartość 100 wynika z konfiguracji routera ASBR (R2), gdzie ustawiono `default-metric 100`. Router R5 widzi ten koszt jako 100, niezależnie od tego, jak daleko znajduje się od routera R2.
 ```
 R5#show ip ospf database
 
@@ -1239,6 +1286,8 @@ Link ID         ADV Router      Age         Seq#       Checksum
 Link ID         ADV Router      Age         Seq#       Checksum Tag
 192.168.0.0     192.168.0.2     54          0x80000001 0x00413A 0
 192.168.11.0    192.168.0.2     54          0x80000001 0x00B5BD 0
+```
+```
 R5#show ip ospf database external
 
             OSPF Router with ID (192.168.0.5) (Process ID 1)
@@ -1277,6 +1326,11 @@ R5#show ip ospf database external
         Forward Address: 0.0.0.0
         External Route Tag: 0
 ```
+### Analiza `show ip ospf database external`
+- W bazie widoczne są sieci z domeny RIP, np. `192.168.11.0` (połączenie R1-R2) oraz `192.168.0.0` (obejmująca loopback R1).
+
+- Pole `Metric: 100` potwierdza, że trasa zewnętrzna ma nadany stały koszt 100, co jest zgodne z poleceniem `default-metric 100` wydanym na routerze redystrybuującym (R2).
+
 ```
 R5#show ip ospf database router
 
@@ -1485,3 +1539,16 @@ R5#show ip ospf database router
       Number of TOS metrics: 0
        TOS 0 Metrics: 10
 ```
+### Analiza `show ip ospf database external`
+Aby znaleźć router pełniący funkcję bramy do sieci zewnętrznej (ASBR), analizujemy LSA routera R2:
+
+```
+Link State ID: 192.168.0.2
+Advertising Router: 192.168.0.2
+LS Seq Number: 8000000C
+Checksum: 0xB865
+Length: 84
+AS Boundary Router
+``` 
+
+Identyfikator routera ASBR to `192.168.0.2` (Router R2).
